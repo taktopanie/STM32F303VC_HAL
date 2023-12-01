@@ -21,8 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <my_GPS.h>
-#include <string.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,8 +44,12 @@ UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
-uint8_t buffor_USART2 [2000];
-uint8_t buffor_USART3 [50];
+uint8_t buffor_USART2 [5];
+uint8_t buffor_USART3 [10];
+uint8_t rec_buff[500];
+
+volatile GPS_Position_Data_t position;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,8 +125,13 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
+	  if(position.Latitude != 0)
+	  {
+		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
+		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_11);
+		position.Latitude = 0;
+	  }
+	/* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -323,6 +331,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+	static uint8_t rec_status = 0;
 	/////////////////////////////////// bridge between UART2 <====> UART3
 	if(huart == &huart3)
 	{
@@ -342,8 +351,28 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		HAL_UART_Transmit(&huart3, buffor_USART2, 1, 0); // 0 delay - very important!!
 		//}
 
+		//IF FUNCTION WILL BE RECEIVED
+		if(rec_status)
+		{
+			rec_buff[rec_status-1] = buffor_USART2[0];
+			if(rec_buff[rec_status-1] == '\n')
+			{
+				position = GPS_get_position(rec_buff, rec_status-1);
+				rec_status = 0;
+			}else{
+				rec_status++;
+			}
+
+		}
+		//Start of the phrase, start recordint
+		if(buffor_USART2[0] == '$'){
+			rec_status = 1;
+		}
 
 		HAL_UART_Receive_IT(&huart2, buffor_USART2, 1);
+
+
+
 	}
 	///////////////////////////////////////////////////////////////////////////
 }
