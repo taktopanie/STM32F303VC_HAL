@@ -34,6 +34,7 @@ extern "C" {
 #include <my_GPS.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

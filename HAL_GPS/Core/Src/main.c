@@ -32,6 +32,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+// SET UP TIMEZONE AND TURN ON INTERNAL PRINTING
+#define DEBUG_PRINT
+#define TIMEZONE 1
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -125,11 +129,17 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  if(position.Latitude != 0)
+	  if(position.Latitude_deg != 0)
 	  {
+
+#if defined(DEBUG_PRINT)
+		printf("Position: %d.%ld", position.Latitude_deg, position.Latitude_minINdegrees);
+		printf(" %d.%ld", position.Longtitude_deg, position.Longtitude_minINdegrees);
+		printf(" TIME: %02d:%02d:%02d\n", (position.Time.hours + TIMEZONE), position.Time.minutes, position.Time.seconds);
+#endif
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
 		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_11);
-		position.Latitude = 0;
+		position.Latitude_deg = 0;
 	  }
 	/* USER CODE BEGIN 3 */
   }
@@ -358,6 +368,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			if(rec_buff[rec_status-1] == '\n')
 			{
 				position = GPS_get_position(rec_buff, rec_status-1);
+				//Flush buffor
+				for(int i = 0; i < 100; i++)
+				{
+					rec_buff[i] = '\0';
+				}
+
 				rec_status = 0;
 			}else{
 				rec_status++;
