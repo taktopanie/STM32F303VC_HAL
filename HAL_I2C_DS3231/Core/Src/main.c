@@ -96,21 +96,36 @@ int main(void)
 
   //printf("data: %d\n", BUFFER[0]);
   /* USER CODE END 2 */
+  DS3231_set_alarm(&hi2c1, ALARM_1);
 
   DS3231_Time_t timer_time;
+  timer_time.time_hr = 22;
+  timer_time.time_min = 59;
+  timer_time.time_sec = 50;
 
-
-  printf("HELLO");
+  DS3231_set_time(&hi2c1, timer_time);
+  printf("Program is working...\n");
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  uint8_t alarm_status = 0;
+
   while (1)
   {
     /* USER CODE END WHILE */
 
-	 // HAL_Delay(1000);
     /* USER CODE BEGIN 3 */
 	  timer_time = DS3231_get_time(&hi2c1);
-	  HAL_Delay(1000);
+	  alarm_status = DS3231_get_alarm(&hi2c1, ALARM_1);
+
+	  if(alarm_status)
+	  {
+		  DS3231_clear_alarm(&hi2c1, ALARM_1);
+		  printf("ALARM CLEARED\n\r");
+	 }
+	  HAL_Delay(200);
+	  alarm_status = DS3231_get_alarm(&hi2c1, ALARM_1);
+	  printf("%02d:%02d:%02d\n ALARM STATUS: %d\n\n", timer_time.time_hr, timer_time.time_min, timer_time.time_sec, alarm_status);
   }
   /* USER CODE END 3 */
 }
