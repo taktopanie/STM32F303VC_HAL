@@ -94,17 +94,31 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
 
-  //printf("data: %d\n", BUFFER[0]);
-  /* USER CODE END 2 */
-  DS3231_set_alarm(&hi2c1, ALARM_1);
+  /*
+   * Fill the alarm DS3231_Alarm_t structure
+   */
+  DS3231_Alarm_t alarm_trigger;
 
-  DS3231_Time_t timer_time;
-  timer_time.time_hr = 22;
-  timer_time.time_min = 59;
-  timer_time.time_sec = 50;
+  alarm_trigger.sec = 12;
+  alarm_trigger.min = 1;
+  alarm_trigger.trigger = ALARM_1_min_sec_match;
 
-  DS3231_set_time(&hi2c1, timer_time);
+  /*
+   * Call DS3231_set_alarm function with the given alarm structure
+   */
+  DS3231_set_alarm(&hi2c1, ALARM_1, alarm_trigger);
+
+  /*
+   * Fill the DS3231_Time_t stucture with time information
+   */
+  DS3231_Time_t timer_time = {0,0,0,0,0,0,0};
+
+
+
   printf("Program is working...\n");
+
+  /* USER CODE END 2 */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
@@ -115,6 +129,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
 	  timer_time = DS3231_get_time(&hi2c1);
 	  alarm_status = DS3231_get_alarm(&hi2c1, ALARM_1);
 
@@ -123,10 +138,20 @@ int main(void)
 		  DS3231_clear_alarm(&hi2c1, ALARM_1);
 		  printf("ALARM CLEARED\n\r");
 	 }
-	  HAL_Delay(200);
 	  alarm_status = DS3231_get_alarm(&hi2c1, ALARM_1);
-	  printf("%02d:%02d:%02d\n ALARM STATUS: %d\n\n", timer_time.time_hr, timer_time.time_min, timer_time.time_sec, alarm_status);
+	  HAL_Delay(1000);
+
+
+	  if(CONNECTION_LOST){
+		  printf("PROBLEM WITH I2C BUS CHECK THE CONNECTION...\n\n");
+		  continue;
+	  }
+
+	  printf("%02d:%02d:%02d DAY: %d, DATE: %d, MONTH: %d, YEAR_100: %d\n ALARM STATUS: %d\n\n",\
+			  timer_time.time_hr, timer_time.time_min, timer_time.time_sec,timer_time.day,\
+			  timer_time.date, timer_time.month, timer_time.year_100, alarm_status);
   }
+
   /* USER CODE END 3 */
 }
 
@@ -246,10 +271,8 @@ static void MX_GPIO_Init(void)
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT1_Pin
-                           MEMS_INT2_Pin */
-  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT1_Pin
-                          |MEMS_INT2_Pin;
+  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT2_Pin */
+  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
@@ -265,11 +288,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SPI1_SCK_Pin SPI1_MISO_Pin SPI1_MISOA7_Pin */
   GPIO_InitStruct.Pin = SPI1_SCK_Pin|SPI1_MISO_Pin|SPI1_MISOA7_Pin;
@@ -287,6 +310,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF14_USB;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -296,6 +323,24 @@ int I2C_init(I2C_HandleTypeDef* I2C){
 //	I2C->
 	return 0;
 }
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == GPIO_PIN_0)
+	{
+		  DS3231_Time_t timer_time = {0,0,0,0,0,0,0};
+		  timer_time.time_hr = 14;
+		  timer_time.time_min = 47;
+		  timer_time.time_sec = 50;
+		  timer_time.day = 7;
+		  timer_time.month = 12;
+		  timer_time.date = 31;
+		  timer_time.year_100 = 24;
+
+		  DS3231_set_time(&hi2c1, timer_time);
+	}
+}
+
 /* USER CODE END 4 */
 
 /**
