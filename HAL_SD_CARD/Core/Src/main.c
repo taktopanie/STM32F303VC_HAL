@@ -165,26 +165,47 @@ int main(void)
 
   //Now let's try and write a file "write.txt"
   fres = f_open(&fil, "write.txt", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
+
+
   if(fres == FR_OK) {
 	myprintf("I was able to open 'write.txt' for writing\r\n");
   } else {
 	myprintf("f_open error (%i)\r\n", fres);
   }
 
-  //Copy in a string
-  strncpy((char*)readBuf, "a new file is made!", 19);
-  UINT bytesWrote;
-  fres = f_write(&fil, readBuf, 19, &bytesWrote);
-  if(fres == FR_OK) {
-	myprintf("Wrote %i bytes to 'write.txt'!\r\n", bytesWrote);
-  } else {
-	myprintf("f_write error (%i)\r\n");
-  }
+
 
   //Be a tidy kiwi - don't forget to close your file!
   f_close(&fil);
 
-  //We're done, so de-mount the drive
+  for(int i = 0; i < 5; i++)
+  {
+	  fres = f_open(&fil, "write.txt", FA_WRITE | FA_OPEN_ALWAYS );
+
+
+	  if(fres == FR_OK) {
+		myprintf("I was able to open 'write.txt' for writing\r\n");
+
+		//APPEND
+		f_lseek(&fil, fil.fsize);
+	  } else {
+		myprintf("f_open error (%i)\r\n", fres);
+	  }
+
+	  //Copy in a string
+	  strncpy((char*)readBuf, "a new file is made!\n", 20);
+	  UINT bytesWrote;
+	  fres = f_write(&fil, readBuf, 20, &bytesWrote);
+	  if(fres == FR_OK) {
+		myprintf("Wrote %i bytes to 'write.txt'!\r\n", bytesWrote);
+	  } else {
+		myprintf("f_write error (%i)\r\n");
+	  }
+
+	  //Be a tidy kiwi - don't forget to close your file!
+	  f_close(&fil);
+  }
+  //Unmount just for testing
   f_mount(NULL, "", 0);
 
   /* USER CODE END 2 */
@@ -193,6 +214,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
       //Blink the LED every second
 	 // HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 	 // HAL_Delay(1000);
@@ -351,10 +373,8 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT1_Pin
-                           MEMS_INT2_Pin */
-  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT1_Pin
-                          |MEMS_INT2_Pin;
+  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT2_Pin */
+  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
@@ -370,11 +390,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SPI1_SCK_Pin SPI1_MISO_Pin SPI1_MISOA7_Pin */
   GPIO_InitStruct.Pin = SPI1_SCK_Pin|SPI1_MISO_Pin|SPI1_MISOA7_Pin;
@@ -407,12 +427,21 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	//We're done, so de-mount the drive
+	f_mount(NULL, "", 0);
+	myprintf("I closed the SD card connection\r\nSDcard can be removed...\r\n");
+}
 /* USER CODE END 4 */
 
 /**
