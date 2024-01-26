@@ -49,7 +49,7 @@ TIM_HandleTypeDef htim2;
 //uint32_t result_ADC;
 
 uint8_t ADC_data[3];
-
+uint8_t ADC_injected;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -107,20 +107,23 @@ int main(void)
 //    __NOP();
 //  }
 
-  //THIS FUNCTION BLOCKS THE PROGRAM <<< ONLY DMA WORKING
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)ADC_data, 3);
+  //~THIS FUNCTION BLOCKS THE PROGRAM <<< ONLY DMA WORKING ~ (TURNING OFF DMA IRQ's FIXED THE ISSUE)
+
+  //TURN ON TIMER2 but only with CC1 IRQ
   HAL_TIM_Base_Start(&htim2);
   __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_CC1);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)ADC_data, 3);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
-//	  HAL_ADCEx_InjectedStart(&hadc1);
-//	  HAL_Delay(1000);
-//	  ADC_data[0] = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
+		//make the injected measurements
+//		HAL_ADCEx_InjectedStart(&hadc1);
+//		//HAL_Delay(1000);
+//		ADC_injected = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -187,6 +190,7 @@ static void MX_ADC1_Init(void)
 
   ADC_MultiModeTypeDef multimode = {0};
   ADC_ChannelConfTypeDef sConfig = {0};
+  ADC_InjectionConfTypeDef sConfigInjected = {0};
 
   /* USER CODE BEGIN ADC1_Init 1 */
 
@@ -250,6 +254,25 @@ static void MX_ADC1_Init(void)
   {
     Error_Handler();
   }
+
+  /** Configure Injected Channel
+  */
+  sConfigInjected.InjectedChannel = ADC_CHANNEL_1;
+  sConfigInjected.InjectedRank = ADC_INJECTED_RANK_1;
+  sConfigInjected.InjectedSingleDiff = ADC_SINGLE_ENDED;
+  sConfigInjected.InjectedNbrOfConversion = 1;
+  sConfigInjected.InjectedSamplingTime = ADC_SAMPLETIME_181CYCLES_5;
+  sConfigInjected.ExternalTrigInjecConvEdge = ADC_EXTERNALTRIGINJECCONV_EDGE_RISING;
+  sConfigInjected.ExternalTrigInjecConv = ADC_INJECTED_SOFTWARE_START;
+  sConfigInjected.AutoInjectedConv = DISABLE;
+  sConfigInjected.InjectedDiscontinuousConvMode = DISABLE;
+  sConfigInjected.QueueInjectedContext = DISABLE;
+  sConfigInjected.InjectedOffset = 0;
+  sConfigInjected.InjectedOffsetNumber = ADC_OFFSET_NONE;
+  if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
@@ -287,7 +310,7 @@ static void MX_TIM2_Init(void)
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_ETRMODE2;
   sClockSourceConfig.ClockPolarity = TIM_CLOCKPOLARITY_NONINVERTED;
   sClockSourceConfig.ClockPrescaler = TIM_CLOCKPRESCALER_DIV1;
-  sClockSourceConfig.ClockFilter = 0;
+  sClockSourceConfig.ClockFilter = 0xf;
   if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
   {
     Error_Handler();
@@ -313,11 +336,6 @@ static void MX_DMA_Init(void)
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
 
-  /* DMA interrupt init */
-  /* DMA1_Channel1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-
 }
 
 /**
@@ -339,7 +357,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|LD5_Pin
+  HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|GPIO_PIN_10
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin, GPIO_PIN_RESET);
 
@@ -351,10 +369,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CS_I2C_SPI_Pin LD4_Pin LD3_Pin LD5_Pin
+  /*Configure GPIO pins : CS_I2C_SPI_Pin LD4_Pin LD3_Pin PE10
                            LD7_Pin LD9_Pin LD10_Pin LD8_Pin
                            LD6_Pin */
-  GPIO_InitStruct.Pin = CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|LD5_Pin
+  GPIO_InitStruct.Pin = CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|GPIO_PIN_10
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -393,7 +411,10 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 {
-//IRQ
+	//make the injected measurements
+	while(HAL_ADCEx_InjectedStart(&hadc1) != HAL_OK);
+	ADC_injected = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
+	while(HAL_ADCEx_InjectedStop(&hadc1) != HAL_OK);
 }
 /* USER CODE END 4 */
 
