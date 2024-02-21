@@ -38,6 +38,17 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MAGNETIC_TEMP_HIGH_REG		0x31
+#define MAGNETIC_TEMP_LOW_REG		0x32
+
+#define MAGNETIC_X_LOW_REG			0x04
+#define MAGNETIC_X_HIGH_REG			0x03
+
+#define MAGNETIC_Z_LOW_REG			0x06
+#define MAGNETIC_Z_HIGH_REG			0x05
+
+#define MAGNETIC_Y_LOW_REG			0x08
+#define MAGNETIC_Y_HIGH_REG			0x07
 
 /* USER CODE END PD */
 
@@ -58,13 +69,21 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
-
+void device_send(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size);
+void device_receive(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t MemAddress, uint8_t *pData, uint16_t Size);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 uint8_t OUT_X_L;
 uint8_t OUT_X_H;
+
+
+uint16_t TEMP_H_L;
+float temperature;
+
+uint8_t TESTING[20];
+
 /* USER CODE END 0 */
 
 /**
@@ -99,19 +118,31 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   //MODULE
-  uint8_t module_addr = (0x19<<1);
+  //uint8_t accelerometer_module_addr = (0x19 << 1);
+  uint8_t magnetic_module_addr = (0x1E << 1);
 
-  //CONTROL REGISTER
-  uint8_t memory_addr = 0x20;
-
+  //temporary buffor
   uint8_t data_buff [2];
 
-  //TURN ON X AXIS
-  data_buff[0] = 0x20;
-  data_buff[1] = 0x7 | (1 << 4);
+//  //TURN ON X AXIS ACCELEROMETER
+//  data_buff[0] = 0x20;
+//  data_buff[1] = 0x7 | (1 << 4);
+//
+//  HAL_I2C_Master_Transmit(&hi2c1, accelerometer_module_addr, &data_buff[0], 2, HAL_MAX_DELAY);
+//  HAL_Delay(200);
 
-  HAL_I2C_Master_Transmit(&hi2c1, module_addr, &data_buff[0], 2, HAL_MAX_DELAY);
-  HAL_Delay(200);
+  //turn on the termomether in magnetic module
+  data_buff[0] = 0x00;
+  data_buff[1] = (1 << 7) | (1 << 4);
+
+	//HAL_I2C_Master_Transmit(&hi2c1, magnetic_module_addr, data_buff, 2, 100);
+  device_send(&hi2c1, magnetic_module_addr, data_buff, 2);
+
+ //set up normal mode
+  data_buff[0] = 0x02;
+  data_buff[1] = 0x0;
+  device_send(&hi2c1, magnetic_module_addr, data_buff, 2);
+	//HAL_I2C_Master_Transmit(&hi2c1, magnetic_module_addr, data_buff, 2, 100);
 
   /* USER CODE END 2 */
 
@@ -119,18 +150,38 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+	  ////THUS PART OF THE CODE UNFREEZE NEXT CODE _____ TODO
+	  	data_buff[0] = 0x03;
+		HAL_I2C_Master_Transmit(&hi2c1, magnetic_module_addr, data_buff, 1, 100);
+		HAL_I2C_Master_Receive(&hi2c1, magnetic_module_addr, TESTING, 6, 100);
+
+//		HAL_Delay(100);
+
+	  //GET THE X-axis MAGNETIC VALUE
+
+	  	  uint8_t tmp = MAGNETIC_X_LOW_REG;
+		HAL_I2C_Master_Transmit(&hi2c1, magnetic_module_addr, &tmp, 1, 100);
+		HAL_I2C_Master_Receive(&hi2c1, magnetic_module_addr, &OUT_X_L, 1, 100);
+		HAL_Delay(200);
+
+	  	  tmp = MAGNETIC_X_HIGH_REG;
+			HAL_I2C_Master_Transmit(&hi2c1, magnetic_module_addr, &tmp, 1, 100);
+			HAL_I2C_Master_Receive(&hi2c1, magnetic_module_addr, &OUT_X_H, 1, 100);
+			HAL_Delay(200);
+//	  device_receive(&hi2c1, magnetic_module_addr, MAGNETIC_X_HIGH_REG, &OUT_X_H, 1);
+//	  device_receive(&hi2c1, magnetic_module_addr, MAGNETIC_X_LOW_REG, &OUT_X_L, 1);
+
+
+////	  //GET THE TEMPERATURE
+//	  device_receive(&hi2c1, magnetic_module_addr, MAGNETIC_TEMP_HIGH_REG, (uint8_t*)&TEMP_H_L, 2);
+//	  uint16_t tmp = ((TEMP_H_L & 0xFF) << 8) | (TEMP_H_L >> 8);
+//	  temperature = (float)(tmp >> 4)/8 + 25;
+
+
     /* USER CODE END WHILE */
-	  //OUT_X_L
-	  memory_addr = 0x28;
-	  HAL_I2C_Master_Transmit(&hi2c1, module_addr, &memory_addr, 1, HAL_MAX_DELAY);
-	  HAL_I2C_Master_Receive(&hi2c1, module_addr, &OUT_X_L, 1, HAL_MAX_DELAY);
-	  HAL_Delay(200);
-//
-//	  //OUT_X_H
-	  memory_addr = 0x29;
-	  HAL_I2C_Master_Transmit(&hi2c1, module_addr, &memory_addr, 1, HAL_MAX_DELAY);
-	  HAL_I2C_Master_Receive(&hi2c1, module_addr, &OUT_X_H, 1, HAL_MAX_DELAY);
-	  HAL_Delay(200);
+
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -298,7 +349,20 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void device_send(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size)
+{
+	 HAL_I2C_Master_Transmit(hi2c, DevAddress, pData, Size, 100);
+	 while(HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY){};
+}
 
+void device_receive(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t MemAddress, uint8_t *pData, uint16_t Size)
+{
+	uint8_t mem = MemAddress;
+	HAL_I2C_Master_Transmit(hi2c, DevAddress, &mem, 1, 100);
+	while(HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY){};
+	HAL_I2C_Master_Receive(hi2c, DevAddress, pData, Size, 100);
+	while(HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY){};
+}
 /* USER CODE END 4 */
 
 /**
