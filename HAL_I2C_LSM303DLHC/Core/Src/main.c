@@ -28,7 +28,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "LSM303DLHC.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -38,17 +38,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MAGNETIC_TEMP_HIGH_REG		0x31
-#define MAGNETIC_TEMP_LOW_REG		0x32
 
-#define MAGNETIC_X_LOW_REG			0x04
-#define MAGNETIC_X_HIGH_REG			0x03
-
-#define MAGNETIC_Z_LOW_REG			0x06
-#define MAGNETIC_Z_HIGH_REG			0x05
-
-#define MAGNETIC_Y_LOW_REG			0x08
-#define MAGNETIC_Y_HIGH_REG			0x07
 
 /* USER CODE END PD */
 
@@ -75,19 +65,14 @@ void device_receive(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t MemAdd
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-typedef struct
-{
-	int8_t X_H;
-	int8_t X_L;
-	int8_t Z_H;
-	int8_t Z_L;
-	int8_t Y_H;
-	int8_t Y_L;
 
-}position_t;
+//RAW DATA FROM THE SENSOR
+uint8_t 	RAW_DATA [6];
+uint16_t 	RAW_TEMP;
 
-position_t POSITION;
-float temperature;
+//PROCESSED DATA
+position_t 	POSITION;
+float 		TEMPERATURE;
 
 /* USER CODE END 0 */
 
@@ -128,9 +113,9 @@ int main(void)
 
   //temporary registers
   uint8_t _data_buff [2];
-  uint8_t _RAW_DATA [6];
-  uint16_t _TEMP_H_L;
-  uint16_t tmp;
+
+
+
 
 //  //TURN ON X AXIS ACCELEROMETER
 //  data_buff[0] = 0x20;
@@ -164,24 +149,13 @@ int main(void)
 	//GET ALL AXES MAGNETIC VALUE
 
 	//FEED THE DEVICE WITH FIRST REGISTER ADDRESS
-	_data_buff[0] = MAGNETIC_X_LOW_REG;
-	device_send(&hi2c1, magnetic_module_addr, _data_buff, 1);
-	device_receive(&hi2c1, magnetic_module_addr, MAGNETIC_X_LOW_REG, _RAW_DATA, 6);
-
-	POSITION.X_H = (int8_t)_RAW_DATA[0];
-	POSITION.X_L = (int8_t)_RAW_DATA[1];
-	POSITION.Z_H = (int8_t)_RAW_DATA[2];
-	POSITION.Z_L = (int8_t)_RAW_DATA[3];
-	POSITION.Y_H = (int8_t)_RAW_DATA[4];
-	POSITION.Y_L = (int8_t)_RAW_DATA[5];
-
+	HAL_I2C_Mem_Read_IT(&hi2c1, magnetic_module_addr, MAGNETIC_X_HIGH_REG, I2C_MEMADD_SIZE_8BIT, RAW_DATA, 6);
 
 	//GET THE TEMPERATURE
-	//HAL_I2C_Mem_Read_IT(&hi2c1, magnetic_module_addr, MAGNETIC_TEMP_HIGH_REG, 1, (uint8_t *)&_TEMP_H_L, 2);
+	HAL_I2C_Mem_Read_IT(&hi2c1, magnetic_module_addr, MAGNETIC_TEMP_HIGH_REG, I2C_MEMADD_SIZE_8BIT, (uint8_t *)&RAW_TEMP, 2);
 
-	device_receive(&hi2c1, magnetic_module_addr, MAGNETIC_TEMP_HIGH_REG, (uint8_t*)&_TEMP_H_L, 2);
-	tmp = ((_TEMP_H_L & 0xFF) << 8) | (_TEMP_H_L >> 8);
-	temperature = (float)(tmp >> 4)/8 + 25;
+	//device_receive(&hi2c1, magnetic_module_addr, MAGNETIC_TEMP_HIGH_REG, (uint8_t*)&_TEMP_H_L, 2);
+
 
     /* USER CODE END WHILE */
 
@@ -367,9 +341,21 @@ void device_receive(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t MemAdd
 	while(HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY){};
 }
 
-void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-
+	if (hi2c->Instance == hi2c1.Instance)
+	{
+		//IF RAW_DATA WAS RECEIVED
+		if(hi2c->pBuffPtr == RAW_DATA+6)
+		{
+			POSITION = MAGNETIC_get_field(RAW_DATA);
+		}
+		//IF TEMPERATURE WAS RECEIVED
+		else if(hi2c->pBuffPtr == ((uint8_t*)&(RAW_TEMP) + 2) )
+		{
+			TEMPERATURE = MAGNETIC_get_temp(RAW_TEMP);
+		}
+	}
 }
 
 /* USER CODE END 4 */
