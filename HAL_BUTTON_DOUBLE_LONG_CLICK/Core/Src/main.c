@@ -62,10 +62,11 @@ enum push_states
 {
 	not_clicked,
 	short_click,
-	long_press
+	long_press,
+	double_click
 };
 
-
+uint8_t BUTTON_CLICKS = 0;
 uint8_t push_state = not_clicked;
 
 /* USER CODE END 0 */
@@ -101,20 +102,15 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-  //HAL_TIM_Base_Start(&htim2);
 
-  //HAL_TIM_Base_Start(&htim2);
-  HAL_TIM_Base_Start_IT(&htim2);
-  HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_2);
-//  HAL_TIM_Base_Start_IT(&htim3);
   HAL_TIM_Base_Start_IT(&htim4);
+  HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
 
     /* USER CODE END WHILE */
 
@@ -172,7 +168,6 @@ static void MX_TIM2_Init(void)
   /* USER CODE END TIM2_Init 0 */
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
 
@@ -199,13 +194,6 @@ static void MX_TIM2_Init(void)
     Error_Handler();
   }
   if (HAL_TIM_OnePulse_Init(&htim2, TIM_OPMODE_SINGLE) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_TRIGGER;
-  sSlaveConfig.InputTrigger = TIM_TS_TI1F_ED;
-  sSlaveConfig.TriggerFilter = 0;
-  if (HAL_TIM_SlaveConfigSynchro(&htim2, &sSlaveConfig) != HAL_OK)
   {
     Error_Handler();
   }
@@ -298,10 +286,8 @@ static void MX_GPIO_Init(void)
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT1_Pin
-                           MEMS_INT2_Pin */
-  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT1_Pin
-                          |MEMS_INT2_Pin;
+  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT2_Pin */
+  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
@@ -316,6 +302,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PC3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SPI1_SCK_Pin SPI1_MISO_Pin SPI1_MISOA7_Pin */
   GPIO_InitStruct.Pin = SPI1_SCK_Pin|SPI1_MISO_Pin|SPI1_MISOA7_Pin;
@@ -341,6 +339,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -351,40 +356,36 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	if(htim == &htim2)
 	{
-		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_12);
+		if(BUTTON_CLICKS == 1)
+		{
+			if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET) push_state = long_press;
+			else push_state = short_click;
+
+		}else if(BUTTON_CLICKS == 2)
+		{
+			push_state = double_click;
+		}
 	}
-//	if(htim == &htim3)
-//	{
-//		uint16_t PRESS_TIME = htim2.Instance->CNT;
-//		htim2.Instance->CNT = 0;
-//
-//		 if(PRESS_TIME )
-//			  {
-//				  if(PRESS_TIME < 5000)
-//				  {
-//					  //short press;
-//					  push_state = short_click;
-//					  PRESS_TIME = 0;
-//				  }
-//				  else
-//				  {
-//					  //long press
-//					  push_state = long_press;
-//					  PRESS_TIME = 0;
-//				  }
-//			  }
-//	}
+
 	if(htim == &htim4)
 	{
 	  if(push_state == long_press)
 	  {
 		  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, DISABLE);
+		  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, DISABLE);
 		  HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_15);
 	  }
 	  if(push_state == short_click)
 	  {
 		  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, DISABLE);
+		  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, DISABLE);
 		  HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
+	  }
+	  if(push_state == double_click)
+	  {
+		  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, DISABLE);
+		  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, DISABLE);
+		  HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_8);
 	  }
 	}
 }
@@ -402,6 +403,19 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 					push_state = short_click;
 				}
 		}
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	//IF TIMER RUNNING
+	if(htim2.Instance->CR1 & (1<<0))
+	{
+		BUTTON_CLICKS++;
+	}else
+	{
+		BUTTON_CLICKS = 1;
+		htim2.Instance->CR1 |= (1<<0);
+	}
 }
 /* USER CODE END 4 */
 
