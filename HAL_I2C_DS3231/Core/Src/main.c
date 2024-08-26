@@ -111,7 +111,7 @@ int main(void)
   /*
    * Fill the DS3231_Time_t stucture with time information
    */
-  DS3231_Time_t timer_time = {0,0,0,0,0,0,0};
+  DS3231_Time_t timer_time = {13,36,35,0,0,0,0};
 
 
 
@@ -129,7 +129,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
+	  DS3231_set_time(&hi2c1, timer_time);
 	  timer_time = DS3231_get_time(&hi2c1);
 	  alarm_status = DS3231_get_alarm(&hi2c1, ALARM_1);
 
