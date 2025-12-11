@@ -22,6 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "LCD_MCUDEV.h"
+#include "ST7735.h"
+#include "fonts.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -101,7 +103,15 @@ int main(void)
   MX_USB_PCD_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-  lcd_init();
+  //lcd_init();
+
+	lcd_init();
+
+	ST7735_FillScreen(ST7735_WHITE);
+
+	FontDef _used_font = Font_11x18;
+	uint16_t bg = ST7735_CYAN;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -115,6 +125,8 @@ int main(void)
 	  lcd_fill_box(64, 0, 32, 160, BLUE);
 	  HAL_Delay(100);
 	  lcd_fill_box(96, 0, 32, 160, BLACK);
+
+	  ST7735_DrawString(20, 10, "Hello", _used_font, ST7735_BLACK, bg);
 	  HAL_Delay(5000);
 
 
@@ -125,7 +137,9 @@ int main(void)
 	  lcd_fill_box(64, 0, 32, 160, CYAN);
 	  HAL_Delay(100);
 	  lcd_fill_box(96, 0, 32, 160, WHITE);
+	  ST7735_DrawString(20, 60, "Goodbye", _used_font, ST7735_BLACK, bg);
 	  HAL_Delay(5000);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
